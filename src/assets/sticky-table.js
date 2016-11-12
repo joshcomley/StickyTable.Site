@@ -56,21 +56,25 @@ ready(function () {
 
         return scrollParent;
     })();
-    var tempIdCount = 0;
     var wrapInDivInternal = function (elm, className, mode, reresolveElement) {
-        var isTempId = false;
-        var originalId = null;
-        if (!reresolveElement && !elm.id) {
-            isTempId = true;
-            originalId = elm.id;
-            elm.id = "stickyTablesTemporaryId" + tempIdCount++;
-        }
-        var org_html = elm[mode];
-        var new_html = "<div class='" + className + "'>" + org_html + "</div>";
-        elm[mode] = new_html;
-        elm = reresolveElement ? reresolveElement(elm) : document.getElementById(elm.id);
-        if (isTempId) {
-            elm.id = originalId;
+        var wrapper = document.createElement("div");
+        wrapper.className = className;
+        if (mode === "innerHTML") {
+            var childNodes = [];
+            for (var i = 0; i < elm.childNodes.length; i++) {
+                childNodes.push(elm.childNodes[i]);
+            }
+            for (var i = 0; i < childNodes.length; i++) {
+                var child = childNodes[i];
+                child.parentNode.removeChild(child);
+                wrapper.appendChild(child);
+            }
+            elm.appendChild(wrapper);
+        } else {
+            var parent = elm.parentNode;
+            parent.insertBefore(wrapper, elm);
+            elm.parentNode.removeChild(elm);
+            wrapper.appendChild(elm);
         }
         return elm;
     }
@@ -81,19 +85,17 @@ ready(function () {
         return wrapInDivInternal(elm, className, "outerHTML", reresolveElement).parentElement;
     }
     var listen = function (element, event, handler) {
-        if (element.addEventListener)
+        if (element.addEventListener) {
             element.addEventListener(event, handler, false);
-        else if (el.attachEvent)
+        }
+        else if (el.attachEvent) {
             element.attachEvent('on' + event, handler);
+        }
     }
     var table = document.getElementById("table");
     var fixed = wrapInDiv(table, "sticky-table-fixed");
     var content = wrapInDiv(fixed, "sticky-table-content");
     var scrollable = wrapInDiv(content, "sticky-table-scrollable");
-    table = document.getElementById("table");
-    fixed = table.parentElement;
-    content = fixed.parentElement;
-    scrollable = content.parentElement;
 
     var getRow = function (row) {
         return table.children[0].children[row];
@@ -117,7 +119,6 @@ ready(function () {
     var header = wrapCell(0, 1, "header");
     var columns = wrapCell(1, 0, "columns");
     var data = wrapCell(1, 1, "data");
-    getCell(0, 0).className = "heyyy";
     var row1 = getRow(0);
     row1.className += " row1";
     var row2 = getRow(1);
@@ -129,7 +130,7 @@ ready(function () {
     // Disable horizontal scrolling "back button" effect
     // in Chrome, and also scrolling the parent scrollable
     // element when scrolling our content (usually the body)
-    listen(scrollable, 'mousewheel', function (event) {
+    var scrollLimiter = function (event) {
         // We don't want to scroll below zero or above the width and height 
         var maxX = this.scrollWidth - this.offsetWidth;
         var maxY = this.scrollHeight - this.offsetHeight;
@@ -141,12 +142,15 @@ ready(function () {
             this.scrollTop + event.deltaY > maxY)) {
             event.preventDefault();
         }
-
-        // Manually set the scroll to the boundary
-        this.scrollLeft = Math.max(0, Math.min(maxX, this.scrollLeft + event.deltaX));
-        this.scrollTop = Math.max(0, Math.min(maxY, this.scrollTop + event.deltaY));
+        else {
+            // Manually set the scroll to the boundary
+            this.scrollLeft = Math.max(0, Math.min(maxX, this.scrollLeft + event.deltaX));
+            this.scrollTop = Math.max(0, Math.min(maxY, this.scrollTop + event.deltaY));
+        }
         //    }
-    }, false);
+    };
+    listen(scrollable, 'mousewheel', scrollLimiter);
+    listen(scrollable, 'wheel', scrollLimiter);
     //  $(".sticky-table-scrollable").scroll(function() {
     //    $("#wrapper").scrollTop($(".sticky-table-scrollable").scrollTop());
     //    $("#wrapper").scrollLeft($(".sticky-table-scrollable").scrollLeft());
@@ -229,23 +233,18 @@ ready(function () {
         setStyle(header.cell, "width", visibleDataWidth);
     };
 
-    //resize(200, 200);
-    // Resolve the scrollable parent for scrolling the parent
-    // once we've scrolled on an extreme X or Y
-    var parent = scollParent(scrollable);
-    if (parent === document.body) {
-        parent = window;
-    }
     var onWheel = function (event) {
-        var eo = event.originalEvent;
+        var elm = scrollable;
+        var eo = event.wheelDelta ? event :
+            (event.originalEvent ? event.originalEvent : event);
         var xy = eo.wheelDelta || -eo.detail; //shortest possible code
-        var x = eo.wheelDeltaX || eo.deltaX || (eo.axis == 1 ? xy : 0);
-        var y = eo.wheelDeltaY || eo.deltaY || (eo.axis == 2 ? xy : 0); // () necessary!
-        var maxX = this.scrollWidth - this.clientWidth;
-        var maxY = this.scrollHeight - this.clientHeight;
-        if (eo.deltaX !== undefined) {
-            var newScrollLeft = this.scrollLeft + eo.deltaX;
-            var newScrollTop = this.scrollTop + eo.deltaY;
+        var x = -eo.wheelDeltaX || eo.deltaX || (eo.axis == 1 ? xy : 0);
+        var y = -eo.wheelDeltaY || eo.deltaY || (eo.axis == 2 ? xy : 0); // () necessary!
+        var maxX = elm.scrollWidth - elm.clientWidth;
+        var maxY = elm.scrollHeight - elm.clientHeight;
+        if (x !== undefined) {
+            var newScrollLeft = elm.scrollLeft + x;
+            var newScrollTop = elm.scrollTop + y;
             var propogate = false;
             if (newScrollLeft < 0) {
                 propogate = true;
@@ -263,8 +262,8 @@ ready(function () {
                 propogate = true;
                 newScrollTop = maxY;
             }
-            this.scrollLeft = newScrollLeft;
-            this.scrollTop = newScrollTop;
+            elm.scrollLeft = newScrollLeft;
+            elm.scrollTop = newScrollTop;
             return propogate;
         }
         return true;
@@ -272,11 +271,25 @@ ready(function () {
     listen(scrollable, "DOMMouseScroll", onWheel);
     listen(scrollable, "mousewheel", onWheel);
     listen(scrollable, "wheel", onWheel);
+
+    // Resolve the scrollable parent for scrolling the parent
+    // once we've scrolled on an extreme X or Y
+    var parentWithScrollEvents = scollParent(scrollable);
+    var parentWithScrollBar = parentWithScrollEvents;
+    if (parentWithScrollEvents === document.body) {
+        parentWithScrollEvents = window;
+    }
+    var syncDocumentScrollPosition = function () {
+        setStyle(fixed, "marginTop", -parentWithScrollBar.scrollTop);
+        setStyle(fixed, "marginLeft", -parentWithScrollBar.scrollLeft);
+    };
     // Sync with scrollable parent
-    listen(parent, "scroll", function () {
-        fixed.style.marginTop = -parent.scrollTop;
-        fixed.style.marginLeft = -parent.scrollLeft;
+    listen(parentWithScrollEvents, "scroll", function () {
+        syncDocumentScrollPosition();
     });
+    syncDocumentScrollPosition();
+    // Just to be sure
+    setTimeout(syncDocumentScrollPosition, 500);
 
     // Resolve these from a hidden, rendered version of the table
     var columnsWidth = 60;
