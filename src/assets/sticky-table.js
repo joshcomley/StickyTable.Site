@@ -136,13 +136,11 @@ ready(function () {
         var maxY = this.scrollHeight - this.offsetHeight;
 
         // If this event looks like it will scroll beyond the bounds of the element, prevent it and set the scroll to the boundary manually 
-        if (!(this.scrollLeft + event.deltaX < 0 ||
+        event.preventDefault();
+        if (this.scrollLeft + event.deltaX < 0 ||
             this.scrollLeft + event.deltaX > maxX ||
             this.scrollTop + event.deltaY < 0 ||
-            this.scrollTop + event.deltaY > maxY)) {
-            event.preventDefault();
-        }
-        else {
+            this.scrollTop + event.deltaY > maxY) {
             // Manually set the scroll to the boundary
             this.scrollLeft = Math.max(0, Math.min(maxX, this.scrollLeft + event.deltaX));
             this.scrollTop = Math.max(0, Math.min(maxY, this.scrollTop + event.deltaY));
