@@ -1,0 +1,9 @@
+.sticky-table-fixed {
+  overflow: hidden;
+  position: fixed;
+}
+
+.sticky-table-scrollable {
+  position: relative;
+  overflow: auto;
+}

@@ -1,0 +1,37 @@
+#box {
+  width: 700px;
+  height: 20px;
+  background-color: purple;
+}
+
+#outer,
+#right {
+  display: inline-block;
+}
+
+td {
+  vertical-align: text-top;
+}
+
+.content {
+  position: absolute;
+}
+
+.content-container,
+.container {
+  overflow: hidden;
+}
+
+.content-container {
+  position: absolute;
+  left: 0;
+}
+
+.data.content-container {
+  position: absolute;
+}
+
+.header.content-container {
+  position: absolute;
+  height: 20px;
+}
