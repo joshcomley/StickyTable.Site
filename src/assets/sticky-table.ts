@@ -346,6 +346,7 @@ export class StickyTable {
 
     public cloneTablePortion(elm: HTMLTableElement, startColumn: number, startRow: number, endColumn?: number, endRow?: number)
         : HTMLTableElement {
+        let $this = this;
         let maxWidth = 0;
         var $sourceTable = elm;
         var $cloneTable = this.cloneElement($sourceTable);
@@ -378,26 +379,44 @@ export class StickyTable {
                 end = $sourceCells.length;
             }
             // Go through each cell
-            for (let j = 0, columnIndex = 0; j < end; j++) {
+            for (let j = startColumn; j < end; j++) {
                 let sourceCell = $sourceCells[j] as HTMLTableCellElement;
                 let cloneCell = $cloneCells[j] as HTMLTableCellElement;
-                let size: ElementSize;
-                if (
-                    row < 3 ||
-                    !columnWidths[columnIndex]
-                ) {
-                    size = this.cloneSize(
-                        sourceCell,
-                        cloneCell,
-                        "inner",
-                        false);
-                    columnWidths[columnIndex] = size.innerWidth;
-                }
-                else {
-                    size = this.getSize(sourceCell);
-                }
-                if (size.width > maxWidth) {
-                    maxWidth = size.width;
+                let tempCell = document.createElement(sourceCell.nodeName);
+                $this.addClass(tempCell, "temp-cell");
+                let sourceParent = sourceCell.parentElement;
+                sourceParent.replaceChild(tempCell, sourceCell);
+                cloneCell.parentElement.replaceChild(sourceCell, cloneCell);
+                sourceParent.replaceChild(cloneCell, tempCell);
+            }
+            $sourceCells = $sourceRow.querySelectorAll("td,th");
+            $cloneCells = $cloneRow.querySelectorAll("td,th");
+            // let $tempCells = $cloneCells;
+            // $cloneCells = $sourceCells;
+            // $sourceCells = $tempCells;
+            for (let j = 0, columnIndex = 0; j < end; j++) {
+                let sourceCell = $sourceCells[j] as HTMLTableCellElement;
+                if (columnIndex >= startColumn && columnIndex <= end) {
+                    let cloneCell = $cloneCells[j] as HTMLTableCellElement;
+                    //sourceCell.parentElement.removeChild(sourceCell);
+                    let size: ElementSize;
+                    if (
+                        row < 3 ||
+                        !columnWidths[columnIndex]
+                    ) {
+                        size = this.cloneSize(
+                            sourceCell,
+                            cloneCell,
+                            "inner",
+                            false);
+                        columnWidths[columnIndex] = size.innerWidth;
+                    }
+                    else {
+                        size = this.getSize(sourceCell);
+                    }
+                    if (size.width > maxWidth) {
+                        maxWidth = size.width;
+                    }
                 }
                 columnIndex += sourceCell.colSpan;
             }
@@ -509,6 +528,7 @@ export class StickyTable {
         this.addClass(this.table, "sticky-table-original");
         this.applyTo(newTable);
     }
+
     private hasClass(ele: HTMLElement, cls: string) {
         if (!ele.className) {
             return false;
