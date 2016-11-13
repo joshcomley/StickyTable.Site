@@ -7,3 +7,13 @@
   position: relative;
   overflow: auto;
 }
+
+.sticky-table-cell-content-container {
+  overflow: hidden;
+  position: absolute;
+  left: 0;
+}
+
+.sticky-table-original {
+  display: none;
+}

@@ -1,0 +1,170 @@
+#matrix-root {
+	overflow: hidden;
+	position: absolute;
+	left: 0;
+
+	#matrix-table-root {
+		height: 700px;
+	}
+
+	.table-responsive {
+		width: 100%;
+	}
+
+	.fixed-column {
+		position: absolute;
+		border-right: 1px solid #ddd;
+	}
+}
+
+/*.matrix.clone.side {
+	position: absolute;
+	margin-top: 244.6px;
+}
+
+.matrix.clone.corner {
+	position: absolute;
+}
+
+.matrix.clone.header {
+	margin-left: 233px;
+	position: absolute;
+}*/
+
+.matrix.clone {
+	margin: 0;
+	padding: 0;
+	//	table-layout: fixed;
+}
+
+.matrix.original {
+
+}
+
+.matrix {
+	border-collapse: collapse;
+	.cell-wrapper {
+		display: table-cell;
+	}
+
+	td,
+	th {
+		border: 1px solid black;
+		width: 1%;
+		padding: 3px;
+	}
+
+	.fixed-column {
+		position: absolute;
+		display: inline-block;
+		width: auto;
+		border-right: 1px solid #ddd;
+	}
+
+	th.course {
+		//width: 100%;
+	}
+
+
+	td.header.department,
+	td.header.location {
+		font-size: 1.5em;
+	}
+
+	td.user-blank {
+		border: none;
+	}
+
+	td.user-blank,
+	td.header.department,
+	td.header.location,
+	tr.group td {
+		background-color: #BFBFBF;
+	}
+
+	tr.member td.name,
+	tr.member td.location {
+		background-color: #FFFF99;
+		padding-right: 10px;
+	}
+
+	th.course,
+	td.expiry-date,
+	th.category {
+		justify-content: center;
+	}
+
+	th.category {
+		font-size: 1.3em;
+	}
+
+	td.expiry-date {
+		padding: 0 10px;
+	}
+
+	th.header.course {
+		font-size: 2em;
+	}
+
+	td.header.department,
+	td.header.location,
+	td.header.accredited-body,
+	tr.group td,
+	th.category,
+	th.course,
+	td.accredited-body {
+		font-weight: bold;
+	}
+
+	th.course {
+		background-color: #FFCC99;
+		//	.rotate2();
+	}
+
+	th .content-wrapper {
+		display: flex;
+		justify-content: center;
+		padding: 10px 5px;
+	}
+
+	th .content {
+		//.rotate(45);
+		//.rotate2();
+		/*transform: scale(-1, -1);
+		-webkit-writing-mode: vertical-lr;
+		-ms-writing-mode: tb-lr;
+		writing-mode: vertical-lr;*/
+		text-align: center;
+	}
+
+	th.category {
+		background-color: #99CCFF;
+		padding: 20px;
+	}
+
+	th.empty {
+		background-color: #FFF;
+		border: none !important;
+	}
+
+	td.sticky,
+	th.sticky {
+		position: absolute;
+	}
+
+	tr:last-child .user-blank {
+		border-bottom: 1px solid black;
+	}
+
+	td.header.accredited-body,
+	td.header.requirement,
+	th.category,
+	td.accredited-body,
+	td.course-requirement {
+		text-align: center;
+	}
+
+	td.required {
+		font-weight: bold;
+	}
+}

@@ -13,11 +13,6 @@ td {
   vertical-align: text-top;
 }
 
-.content {
-  position: absolute;
-}
-
-.content-container,
 .container {
   overflow: hidden;
 }

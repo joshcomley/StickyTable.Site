@@ -5,6 +5,7 @@ import { enableProdMode } from '@angular/core';
 import { environment } from './environments/environment';
 import { AppModule } from './app/';
 require("./assets/sticky-table");
+require("./assets/table.less");
 
 if (environment.production) {
   enableProdMode();

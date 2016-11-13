@@ -1,0 +1,131 @@
+#matrix-root {
+  overflow: hidden;
+  position: absolute;
+  left: 0;
+}
+#matrix-root #matrix-table-root {
+  height: 700px;
+}
+#matrix-root .table-responsive {
+  width: 100%;
+}
+#matrix-root .fixed-column {
+  position: absolute;
+  border-right: 1px solid #ddd;
+}
+/*.matrix.clone.side {
+	position: absolute;
+	margin-top: 244.6px;
+}
+
+.matrix.clone.corner {
+	position: absolute;
+}
+
+.matrix.clone.header {
+	margin-left: 233px;
+	position: absolute;
+}*/
+.matrix.clone {
+  margin: 0;
+  padding: 0;
+}
+.matrix {
+  border-collapse: collapse;
+}
+.matrix .cell-wrapper {
+  display: table-cell;
+}
+.matrix td,
+.matrix th {
+  border: 1px solid black;
+  width: 1%;
+  padding: 3px;
+}
+.matrix .fixed-column {
+  position: absolute;
+  display: inline-block;
+  width: auto;
+  border-right: 1px solid #ddd;
+}
+.matrix td.header.department,
+.matrix td.header.location {
+  font-size: 1.5em;
+}
+.matrix td.user-blank {
+  border: none;
+}
+.matrix td.user-blank,
+.matrix td.header.department,
+.matrix td.header.location,
+.matrix tr.group td {
+  background-color: #BFBFBF;
+}
+.matrix tr.member td.name,
+.matrix tr.member td.location {
+  background-color: #FFFF99;
+  padding-right: 10px;
+}
+.matrix th.course,
+.matrix td.expiry-date,
+.matrix th.category {
+  justify-content: center;
+}
+.matrix th.category {
+  font-size: 1.3em;
+}
+.matrix td.expiry-date {
+  padding: 0 10px;
+}
+.matrix th.header.course {
+  font-size: 2em;
+}
+.matrix td.header.department,
+.matrix td.header.location,
+.matrix td.header.accredited-body,
+.matrix tr.group td,
+.matrix th.category,
+.matrix th.course,
+.matrix td.accredited-body {
+  font-weight: bold;
+}
+.matrix th.course {
+  background-color: #FFCC99;
+}
+.matrix th .content-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 10px 5px;
+}
+.matrix th .content {
+  /*transform: scale(-1, -1);
+		-webkit-writing-mode: vertical-lr;
+		-ms-writing-mode: tb-lr;
+		writing-mode: vertical-lr;*/
+  text-align: center;
+}
+.matrix th.category {
+  background-color: #99CCFF;
+  padding: 20px;
+}
+.matrix th.empty {
+  background-color: #FFF;
+  border: none !important;
+}
+.matrix td.sticky,
+.matrix th.sticky {
+  position: absolute;
+}
+.matrix tr:last-child .user-blank {
+  border-bottom: 1px solid black;
+}
+.matrix td.header.accredited-body,
+.matrix td.header.requirement,
+.matrix th.category,
+.matrix td.accredited-body,
+.matrix td.course-requirement {
+  text-align: center;
+}
+.matrix td.required {
+  font-weight: bold;
+}
