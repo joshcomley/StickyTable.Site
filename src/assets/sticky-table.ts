@@ -214,7 +214,7 @@ export class StickyTable {
         let $this = this;
         if (this.setSizeIncrement === 0) {
             this.incrementTimeout = setTimeout(function () {
-                $this.resize(800, 500);
+                $this.resize();
                 for (let elm of [$this.corner,
                 $this.columns,
                 $this.header,
@@ -224,6 +224,10 @@ export class StickyTable {
                         $this.resize();
                     });
                 }
+                window["addResizeListener"]($this.scrollable.parentElement, function () {
+                    console.log("Resized");
+                    $this.resize();
+                });
                 console.log("Sticky Table - Sizing complete");
             }, 50);
         }
@@ -554,8 +558,15 @@ export class StickyTable {
     }
 
     public resize(width?: number, height?: number) {
-        this.width = width || this.width;
-        this.height = height || this.height;
+        let size = this.getSize(this.scrollable.parentElement);
+        if (!width) {
+            width = size.width;
+        }
+        if (!height) {
+            height = size.height;
+        }
+        this.width = width;
+        this.height = height;
 
         // Resolve these from a hidden, rendered version of the table
         let columnsWidth = this.columns.content.children[0].scrollWidth;
@@ -711,6 +722,7 @@ export class StickyTable {
         this.fixed = $this.wrapInDiv(this.table, "sticky-table-fixed");
         this.content = $this.wrapInDiv(this.fixed, "sticky-table-content");
         this.scrollable = $this.wrapInDiv(this.content, "sticky-table-scrollable");
+        this.scrollable.id = "sticky-table-" + table.id;
         this.tableRows = $this.findRows(table);
         //let tableRows2 = findRows(table);
         this.corner = this.wrapCell(0, 0, "corner");

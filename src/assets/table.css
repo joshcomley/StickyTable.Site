@@ -2,6 +2,8 @@
   overflow: hidden;
   position: absolute;
   left: 0;
+  width: 800px;
+  height: 500px;
 }
 #matrix-root #matrix-table-root {
   height: 700px;
