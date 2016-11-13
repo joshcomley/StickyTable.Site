@@ -660,7 +660,7 @@ export class StickyTable {
         });
 
         let onWheel = function (event) {
-            let elm = this.scrollable;
+            let elm = $this.scrollable;
             let eo = event.wheelDelta ? event :
                 (event.originalEvent ? event.originalEvent : event);
             let xy = eo.wheelDelta || -eo.detail; //shortest possible code
