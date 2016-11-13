@@ -1,5 +1,25 @@
 require("./detect-element-resize.js");
 
+class ClonedTableRow {
+    sourceRow: HTMLTableRowElement;
+    cloneRow: HTMLTableRowElement;
+    cloneCells = new Array<HTMLTableCellElement>();
+    sourceCells = new Array<HTMLTableCellElement>();
+    cellSizes = new Array<ElementSize>();
+
+    constructor(sourceRow: HTMLTableRowElement, cloneRow: HTMLTableRowElement) {
+        this.sourceRow = sourceRow;
+        this.cloneRow = cloneRow;
+    }
+}
+class ClonedTablePortion {
+    table: HTMLTableElement;
+    rows = new Array<ClonedTableRow>();
+
+    constructor(table: HTMLTableElement) {
+        this.table = table;
+    }
+}
 class StickyTablesWrappedCell {
     cell: HTMLTableCellElement;
     content: HTMLElement;
@@ -107,10 +127,13 @@ export class ScrollParentFinder {
 export class StickyTable {
     public width: number;
     public height: number;
+    timeStart: number;
+    timeEnd: number;
     scrollParentFinder = new ScrollParentFinder();
     table: HTMLTableElement;
+    newTable: HTMLTableElement;
     headerRegion: StickyTableRegion;
-    setSizeIncrement = 0;
+    setSizeIncrement = null;
     incrementTimeout: NodeJS.Timer = null;
     fixed: HTMLElement;
     content: HTMLElement;
@@ -122,6 +145,7 @@ export class StickyTable {
     tableRows: Array<HTMLTableRowElement>;
     row1: HTMLTableRowElement;
     row2: HTMLTableRowElement;
+    startTimes: any = {};
 
     constructor(table: HTMLTableElement, headerRegion: StickyTableRegion) {
         this.table = table;
@@ -150,12 +174,15 @@ export class StickyTable {
         }
         return elm;
     }
+
     private wrapContentsInDiv(elm: Element, className: string): HTMLElement {
         return this.wrapInDivInternal(elm, className, "innerHTML").children[0] as HTMLElement;
     }
+
     private wrapInDiv(elm: Element, className: string): HTMLElement {
         return this.wrapInDivInternal(elm, className, "outerHTML").parentElement;
     }
+
     private listen(element: Element, event: string, handler: EventListenerOrEventListenerObject) {
         if (element.addEventListener) {
             element.addEventListener(event, handler, false);
@@ -203,91 +230,119 @@ export class StickyTable {
         elem.style["min-" + attr] = sizeString;
         elem.style["max-" + attr] = sizeString;
     }
+
     private increment() {
         if (this.incrementTimeout !== null) {
             clearTimeout(this.incrementTimeout);
         }
+        if (this.setSizeIncrement === null) {
+            this.timeLogStart("Sizing");
+            this.setSizeIncrement = 0;
+        }
         this.setSizeIncrement++;
     }
+
     private decrement() {
         this.setSizeIncrement--;
         let $this = this;
         if (this.setSizeIncrement === 0) {
             this.incrementTimeout = setTimeout(function () {
+                $this.table.parentNode.insertBefore($this.newTable, $this.table);
+                $this.wrapAndListen($this.newTable);
                 $this.resize();
-                for (let elm of [$this.corner,
-                $this.columns,
-                $this.header,
-                $this.data]) {
-                    window["addResizeListener"](elm.content.children[0], function () {
-                        console.log("Resized");
-                        $this.resize();
-                    });
-                }
                 window["addResizeListener"]($this.scrollable.parentElement, function () {
                     console.log("Resized");
                     $this.resize();
                 });
-                console.log("Sticky Table - Sizing complete");
+                $this.timeEnd = new Date().getTime();
+                $this.timeLogComplete("Sizing", $this.timeEnd);
             }, 50);
         }
     }
-    private setSizeInner(targetSize: ElementSize, attemptedSize: ElementSize, setWidth, setHeight, elm: HTMLElement) {
+
+    private timeLogStart(message: string, time?: number) {
+        time = time || new Date().getTime();
+        this.startTimes[message] = time;
+        //        console.log(time + ": Sticky Table - " + message + " - start");
+    }
+
+    private timeLogComplete(message: string, time?: number) {
+        time = time || new Date().getTime();
+        let total = time - this.startTimes[message];
+        if (total > 50) {
+            console.log(time + ": Sticky Table - " + message + " - complete - " + total + "ms");
+        }
+    }
+
+    private setSizeInner(targetSize: ElementSize, attemptedSize: ElementSize, setWidth: any, setHeight: any, elm: HTMLElement, baseSize?: ElementSize) {
         this.increment();
         let widthSet: any = false;
         let heightSet: any = false;
-        let targetWidthSet: any = false;
-        let targetHeightSet: any = false;
+        let targetWidth: any = false;
+        let targetHeight: any = false;
+        let existingSize = null;
         if (setWidth === true) {
             widthSet = attemptedSize.width;
-            targetWidthSet = targetSize.width;
+            targetWidth = targetSize.width;
         } else if (setWidth === "inner") {
-            widthSet = attemptedSize.innerWidth;
-            targetWidthSet = targetSize.innerWidth;
+            existingSize = baseSize || existingSize || this.getSize(elm);
+            widthSet = existingSize.width + (attemptedSize.innerWidth - existingSize.innerWidth);
+            targetWidth = targetSize.innerWidth;
         }
         if (setHeight === true) {
             heightSet = attemptedSize.height;
-            targetHeightSet = targetSize.innerHeight;
+            targetHeight = targetSize.innerHeight;
         } else if (setHeight === "inner") {
-            heightSet = attemptedSize.innerHeight;
-            targetHeightSet = targetSize.innerHeight;
+            existingSize = baseSize || existingSize || this.getSize(elm);
+            heightSet = existingSize.height + (attemptedSize.innerHeight - existingSize.innerHeight);
+            targetHeight = targetSize.innerHeight;
         }
-        let widthAdjustDirection = 0;
-        let heightAdjustDirection = 0;
+        let widthAdjust = 0;
+        let heightAdjust = 0;
         let anythingSet = false;
         if (widthSet !== false && widthSet >= 0) {
             anythingSet = true;
-            this.setSizeAttr(elm, "width", widthSet);
+            let sizeString = widthSet + "px";
+            elm.style.width = sizeString;
+            elm.style.minWidth = sizeString;
+            elm.style.maxWidth = sizeString;
+            //this.setSizeAttr(elm, "width", widthSet);
         }
         if (heightSet !== false && heightSet >= 0) {
             anythingSet = true;
             this.setSizeAttr(elm, "height", heightSet);
         }
-        if (anythingSet && (widthSet !== false || heightSet !== false)) {
-            let newSize = this.getSize(elm);
-            if (widthSet !== false) {
-                if (newSize.innerWidth - targetWidthSet > 0.1 ||
-                    newSize.innerWidth - targetWidthSet < -0.1) {
-                    widthAdjustDirection = -(newSize.innerWidth - targetWidthSet);
-                }
-            }
-            if (heightSet !== false) {
-                if (newSize.innerHeight - targetHeightSet > 0.1 ||
-                    newSize.innerHeight - targetHeightSet < -0.1) {
-                    heightAdjustDirection = -(newSize.innerHeight - targetHeightSet);
-                }
-            }
-            if (widthAdjustDirection !== 0 || heightAdjustDirection !== 0) {
-                attemptedSize.width += widthAdjustDirection;
-                attemptedSize.innerWidth += widthAdjustDirection;
-                attemptedSize.height += heightAdjustDirection;
-                attemptedSize.innerHeight += heightAdjustDirection;
-                setTimeout(() => {
-                    this.setSizeInner(targetSize, attemptedSize, setWidth, setHeight, elm);
-                },
-                    0);
-            }
-        }
+        // if (anythingSet && (widthSet !== false || heightSet !== false)) {
+        //     let newSize = this.getSize(elm);
+        //     if (widthSet !== false) {
+        //         if (newSize.innerWidth - targetWidth > 0.1 ||
+        //             newSize.innerWidth - targetWidth < -0.1) {
+        //             widthAdjust = -(newSize.innerWidth - targetWidth);
+        //         }
+        //     }
+        //     if (heightSet !== false) {
+        //         if (newSize.innerHeight - targetHeight > 0.1 ||
+        //             newSize.innerHeight - targetHeight < -0.1) {
+        //             heightAdjust = -(newSize.innerHeight - targetHeight);
+        //         }
+        //     }
+        //     if (widthAdjust !== 0 || heightAdjust !== 0) {
+        //         if (heightAdjust !== 0) {
+        //             console.log("here - height");
+        //         }
+        //         if (widthAdjust !== 0) {
+        //             console.log("here - width");
+        //         }
+        //         attemptedSize.width += widthAdjust;
+        //         attemptedSize.innerWidth += widthAdjust;
+        //         attemptedSize.height += heightAdjust;
+        //         attemptedSize.innerHeight += heightAdjust;
+        //         setTimeout(() => {
+        //             this.setSizeInner(targetSize, attemptedSize, setWidth, setHeight, elm);
+        //         },
+        //             0);
+        //     }
+        // }
         this.decrement();
     }
 
@@ -322,38 +377,52 @@ export class StickyTable {
         if (isNaN(parseFloat(w))) {
             w = el.scrollWidth.toString();
         }
+        innerW = innerW || parseFloat(el.style.width);
+        innerH = innerH || parseFloat(el.style.height);
+        if (isNaN(innerW)) {
+            innerW = 0;
+        }
+        if (isNaN(innerH)) {
+            innerH = 0;
+        }
         return new ElementSize(
             parseFloat(w), parseFloat(h),
-            innerW || parseFloat(el.style.width), innerH || parseFloat(el.style.height));
+            innerW, innerH);
     }
 
     private setSize(elem: HTMLElement,
         targetSize: ElementSize,
         attemptedSize: ElementSize,
-        width, height) {
+        width: any,
+        height: any,
+        baseSize?: ElementSize) {
         setTimeout(() => {
-            this.setSizeInner(targetSize, attemptedSize, width, height, elem);
+            this.setSizeInner(targetSize, attemptedSize, width, height, elem, baseSize);
         },
             0);
     }
 
-    private cloneSize(elSource, elClone, width, height): ElementSize {
+    private cloneSize(elSource: HTMLElement, elClone: HTMLElement, width: any, height: any, cloneBaseSize?: ElementSize): ElementSize {
         let size = this.getSize(elSource);
-        let size2 = this.getSize(elSource);
         // Doing this in a setTimeout of zero dramatically increases the
         // performance by allowing it to multi-thread
         if (width || height) {
-            this.setSize(elClone, size, size2, width, height);
+            let size2 = new ElementSize(size.width, size.height, size.innerWidth, size.innerHeight);
+            this.setSize(elClone, size, size2, width, height, cloneBaseSize);
         }
         return size;
     }
+    tempHeaderCell = document.createElement("TH");
+    tempCell = document.createElement("TD");
 
-    public cloneTablePortion(elm: HTMLTableElement, startColumn: number, startRow: number, endColumn?: number, endRow?: number)
-        : HTMLTableElement {
+    public cloneTablePortion(name: string, elm: HTMLTableElement, startColumn: number, startRow: number, endColumn?: number, endRow?: number)
+        : ClonedTablePortion {
+        let title = "clone portion - " + name;
+        this.timeLogStart(title);
         let $this = this;
         let maxWidth = 0;
         var $sourceTable = elm;
-        var $cloneTable = this.cloneElement($sourceTable);
+        var $cloneTable = this.cloneElement($sourceTable) as HTMLTableElement;
         let $cloneRows = $cloneTable.getElementsByTagName("tr");
         if (!endRow) {
             endRow = $cloneRows.length;
@@ -361,6 +430,9 @@ export class StickyTable {
         let rowsToRemove = new Array<HTMLTableRowElement>();
         let row = -1;
         let columnWidths = [];
+        let sourceRows = $sourceTable.getElementsByTagName("tr");
+        let clonedTablePortion = new ClonedTablePortion($cloneTable);
+        this.timeLogStart(title + " - copying cells");
         for (var i = 0; i < $cloneRows.length; i++) {
             let elem = $cloneRows[i];
             if (i < startRow || i > endRow) {
@@ -368,16 +440,17 @@ export class StickyTable {
                 continue;
             }
             row++;
-            let $sourceRow = $sourceTable.getElementsByTagName("tr")[i];
-            this.cloneSize(
-                $sourceRow,
-                elem,
-                false,
-                true);
-
+            let $sourceRow = sourceRows[i];
             let $cloneRow = elem;
-            let $sourceCells = $sourceRow.querySelectorAll("td,th");
-            let $cloneCells = $cloneRow.querySelectorAll("td,th");
+            let rowPortion = new ClonedTableRow($sourceRow, $cloneRow);
+            clonedTablePortion.rows.push(rowPortion);
+            // this.cloneSize(
+            //     $sourceRow,
+            //     $cloneRow,
+            //     false,
+            //     true);
+            let $sourceCells = $sourceRow.cells;//.querySelectorAll("td,th");
+            let $cloneCells = $cloneRow.cells;//.querySelectorAll("td,th");
             let end = endColumn;
             if (!end) {
                 end = $sourceCells.length;
@@ -386,45 +459,24 @@ export class StickyTable {
             for (let j = startColumn; j < end; j++) {
                 let sourceCell = $sourceCells[j] as HTMLTableCellElement;
                 let cloneCell = $cloneCells[j] as HTMLTableCellElement;
-                let tempCell = document.createElement(sourceCell.nodeName);
-                $this.addClass(tempCell, "temp-cell");
+                let tempCell = sourceCell.nodeName.toLowerCase() == "th"
+                    ? this.tempHeaderCell : this.tempCell;
                 let sourceParent = sourceCell.parentElement;
+                //sourceParent.insertBefore(tempCell, sourceCell);
+                //sourceParent.removeChild(sourceCell);
                 sourceParent.replaceChild(tempCell, sourceCell);
                 cloneCell.parentElement.replaceChild(sourceCell, cloneCell);
                 sourceParent.replaceChild(cloneCell, tempCell);
+                rowPortion.cloneCells.push(cloneCell);
+                rowPortion.sourceCells.push(sourceCell);
             }
-            $sourceCells = $sourceRow.querySelectorAll("td,th");
-            $cloneCells = $cloneRow.querySelectorAll("td,th");
+            $sourceCells = $sourceRow.cells;//.querySelectorAll("td,th");
+            $cloneCells = $cloneRow.cells;//.querySelectorAll("td,th");
             // let $tempCells = $cloneCells;
             // $cloneCells = $sourceCells;
             // $sourceCells = $tempCells;
-            for (let j = 0, columnIndex = 0; j < end; j++) {
-                let sourceCell = $sourceCells[j] as HTMLTableCellElement;
-                if (columnIndex >= startColumn && columnIndex <= end) {
-                    let cloneCell = $cloneCells[j] as HTMLTableCellElement;
-                    //sourceCell.parentElement.removeChild(sourceCell);
-                    let size: ElementSize;
-                    if (
-                        row < 3 ||
-                        !columnWidths[columnIndex]
-                    ) {
-                        size = this.cloneSize(
-                            sourceCell,
-                            cloneCell,
-                            "inner",
-                            false);
-                        columnWidths[columnIndex] = size.innerWidth;
-                    }
-                    else {
-                        size = this.getSize(sourceCell);
-                    }
-                    if (size.width > maxWidth) {
-                        maxWidth = size.width;
-                    }
-                }
-                columnIndex += sourceCell.colSpan;
-            }
             if (endColumn || startColumn) {
+                this.timeLogStart("clone portion - cleaning");
                 let index = 0;
                 var endIndex = endColumn || Number.MAX_VALUE;
                 var start = startColumn || 0;
@@ -439,13 +491,16 @@ export class StickyTable {
                 for (let remove of cellsToRemove) {
                     remove.parentElement.removeChild(remove);
                 }
+                this.timeLogComplete("clone portion - cleaning");
             }
         }
+        this.timeLogComplete(title + " - copying cells");
         for (let row of rowsToRemove) {
             row.parentElement.removeChild(row);
         }
         $cloneTable.style.width = maxWidth + "px";
-        return $cloneTable as HTMLTableElement;
+        this.timeLogComplete(title);
+        return clonedTablePortion;//$cloneTable as HTMLTableElement;
     }
 
     public cloneElement(element: HTMLElement): HTMLElement {
@@ -469,14 +524,74 @@ export class StickyTable {
         //element.parentNode.insertBefore(newDiv.children[0], element);
     }
 
+    private getCellSizes(portion: ClonedTablePortion) {
+        for (let row of portion.rows) {
+            for (let cell of row.cloneCells) {
+                let size = this.getSize(cell);
+                row.cellSizes.push(size);
+            }
+        }
+    }
+
+    private forceSize(portion: ClonedTablePortion) {
+        let rowIndex = 0;
+        for (let row of portion.rows) {
+            this.cloneSize(
+                row.sourceRow,
+                row.cloneRow,
+                false,
+                true);
+            if (rowIndex < 3) {
+                for (var i = 0; i < row.sourceCells.length; i++) {
+                    this.cloneSize(
+                        row.cloneCells[i],
+                        row.sourceCells[i],
+                        "inner",
+                        false,
+                        row.cellSizes[i]);
+                }
+            }
+            rowIndex++;
+        }
+        // for (let j = 0, columnIndex = 0; j < end; j++) {
+        //     let sourceCell = $sourceCells[j] as HTMLTableCellElement;
+        //     if (columnIndex >= startColumn && columnIndex <= end) {
+        //         let cloneCell = $cloneCells[j] as HTMLTableCellElement;
+        //         //sourceCell.parentElement.removeChild(sourceCell);
+        //         let size: ElementSize;
+        //         if (
+        //             row < 3 ||
+        //             !columnWidths[columnIndex]
+        //         ) {
+        //             size = this.cloneSize(
+        //                 sourceCell,
+        //                 cloneCell,
+        //                 "inner",
+        //                 false);
+        //             columnWidths[columnIndex] = size.innerWidth;
+        //         }
+        //         else {
+        //             size = this.getSize(sourceCell);
+        //         }
+        //         if (size.width > maxWidth) {
+        //             maxWidth = size.width;
+        //         }
+        //     }
+        //     columnIndex += sourceCell.colSpan;
+        // }
+    }
+
     public apply() {
+        this.timeStart = new Date().getTime();
+        this.timeLogStart("apply()", this.timeStart);
+
         let tableClone = this.cloneElement(this.table);
 
-        let newTable = document.createElement("table");
+        this.newTable = document.createElement("table");
         let row1 = document.createElement("tr");
         let row2 = document.createElement("tr");
-        newTable.appendChild(row1);
-        newTable.appendChild(row2);
+        this.newTable.appendChild(row1);
+        this.newTable.appendChild(row2);
         let corner = document.createElement("td");
         let header = document.createElement("td");
         let columns = document.createElement("td");
@@ -485,19 +600,6 @@ export class StickyTable {
         row1.appendChild(header);
         row2.appendChild(columns);
         row2.appendChild(data);
-
-        //row2.appendChild(data);
-        // corner.innerHTML = "Corner";
-        // data.innerHTML = "Data";
-        // columns.innerHTML = "Columns";
-        // header.innerHTML = "Header";
-        this.table.parentNode.insertBefore(newTable, this.table);
-
-        // let cellToMove = table.getElementsByClassName("myspecialfield")[0] as HTMLTableCellElement;
-        // let cellClone = this.cloneElement(cellToMove);
-        // cellToMove.parentNode.insertBefore(cellClone, cellToMove);
-        // cellToMove.parentNode.removeChild(cellToMove);
-        // row2.appendChild(cellToMove);
 
         let columnRegion = new StickyTableRegionInternal(
             0,
@@ -517,20 +619,35 @@ export class StickyTable {
             0,
             this.headerRegion.endRow
         );
+        let replacement = document.createElement("div");
+        this.table.parentNode.replaceChild(replacement, this.table);
+        this.timeLogComplete("apply()");
+        this.timeLogStart("cloning()");
         let headerPortion =
-            this.cloneTablePortion(this.table, this.headerRegion.startColumn, 0, null, this.headerRegion.endRow);
-        header.appendChild(headerPortion);
+            this.cloneTablePortion("header", this.table, this.headerRegion.startColumn, 0, null, this.headerRegion.endRow);
+        header.appendChild(headerPortion.table);
         let columnsPortion =
-            this.cloneTablePortion(this.table, columnRegion.startColumn, columnRegion.startRow, columnRegion.endColumn, null);
-        columns.appendChild(columnsPortion);
+            this.cloneTablePortion("columns", this.table, columnRegion.startColumn, columnRegion.startRow, columnRegion.endColumn, null);
+        columns.appendChild(columnsPortion.table);
         let cornerPortion =
-            this.cloneTablePortion(this.table, 0, 0, cornerRegion.endColumn, cornerRegion.endRow);
-        corner.appendChild(cornerPortion);
+            this.cloneTablePortion("corner", this.table, 0, 0, cornerRegion.endColumn, cornerRegion.endRow);
+        corner.appendChild(cornerPortion.table);
         let dataPortion =
-            this.cloneTablePortion(this.table, dataRegion.startColumn, dataRegion.startRow, null, null);
-        data.appendChild(dataPortion);
-        this.addClass(this.table, "sticky-table-original");
-        this.applyTo(newTable);
+            this.cloneTablePortion("data", this.table, dataRegion.startColumn, dataRegion.startRow, null, null);
+        data.appendChild(dataPortion.table);
+        this.timeLogComplete("cloning()");
+        //this.addClass(this.table, "sticky-table-original");
+        let portions = [headerPortion, columnsPortion, cornerPortion, dataPortion];
+        replacement.parentNode.replaceChild(this.table, replacement);
+        this.table.parentNode.insertBefore(this.newTable, this.table);
+        for (let portion of portions) {
+            this.getCellSizes(portion);
+        }
+        this.newTable.parentNode.removeChild(this.newTable);
+        for (let portion of portions) {
+            this.forceSize(portion);
+        }
+        //this.wrapAndListen(this.newTable);
     }
 
     private hasClass(ele: HTMLElement, cls: string) {
@@ -716,7 +833,8 @@ export class StickyTable {
         return tableRows;
     }
 
-    private applyTo(table: HTMLTableElement) {
+    private wrapAndListen(table: HTMLTableElement) {
+        this.timeLogStart("applyTo()");
         let $this = this;
         this.table = table;
         this.fixed = $this.wrapInDiv(this.table, "sticky-table-fixed");
@@ -773,6 +891,7 @@ export class StickyTable {
         syncDocumentScrollPosition();
         // Just to be sure
         setTimeout(syncDocumentScrollPosition, 500);
+        this.timeLogComplete("applyTo()");
     }
 }
 document.addEventListener("DOMContentLoaded", function (event) {
