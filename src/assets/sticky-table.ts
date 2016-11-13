@@ -585,7 +585,42 @@ export class StickyTable {
         elm.style[style] = parseFloat(value) + "px";
     }
 
-    public applyTo(table: HTMLTableElement) {
+    private onWheel(event, stickyContext: StickyTable) {
+        let elm = stickyContext.scrollable;
+        let eo = event.wheelDelta ? event :
+            (event.originalEvent ? event.originalEvent : event);
+        let xy = eo.wheelDelta || -eo.detail; //shortest possible code
+        let x = -eo.wheelDeltaX || eo.deltaX || (eo.axis == 1 ? xy : 0);
+        let y = -eo.wheelDeltaY || eo.deltaY || (eo.axis == 2 ? xy : 0); // () necessary!
+        let maxX = elm.scrollWidth - elm.clientWidth;
+        let maxY = elm.scrollHeight - elm.clientHeight;
+        if (x !== undefined) {
+            let newScrollLeft = elm.scrollLeft + x;
+            let newScrollTop = elm.scrollTop + y;
+            let propogate = false;
+            if (newScrollLeft < 0) {
+                propogate = true;
+                newScrollLeft = 0;
+            }
+            if (newScrollLeft > maxX) {
+                propogate = true;
+                newScrollLeft = maxX;
+            }
+            if (newScrollTop < 0) {
+                propogate = true;
+                newScrollTop = 0;
+            }
+            if (newScrollTop > maxY) {
+                propogate = true;
+                newScrollTop = maxY;
+            }
+            elm.scrollLeft = newScrollLeft;
+            elm.scrollTop = newScrollTop;
+            return propogate;
+        }
+        return true;
+    }
+    private applyTo(table: HTMLTableElement) {
         let $this = this;
         this.table = table;
         this.fixed = $this.wrapInDiv(this.table, "sticky-table-fixed");
@@ -659,44 +694,12 @@ export class StickyTable {
             syncScroll(ScrollDataType.Left, $this.scrollable, $this.header.cell);
         });
 
-        let onWheel = function (event) {
-            let elm = $this.scrollable;
-            let eo = event.wheelDelta ? event :
-                (event.originalEvent ? event.originalEvent : event);
-            let xy = eo.wheelDelta || -eo.detail; //shortest possible code
-            let x = -eo.wheelDeltaX || eo.deltaX || (eo.axis == 1 ? xy : 0);
-            let y = -eo.wheelDeltaY || eo.deltaY || (eo.axis == 2 ? xy : 0); // () necessary!
-            let maxX = elm.scrollWidth - elm.clientWidth;
-            let maxY = elm.scrollHeight - elm.clientHeight;
-            if (x !== undefined) {
-                let newScrollLeft = elm.scrollLeft + x;
-                let newScrollTop = elm.scrollTop + y;
-                let propogate = false;
-                if (newScrollLeft < 0) {
-                    propogate = true;
-                    newScrollLeft = 0;
-                }
-                if (newScrollLeft > maxX) {
-                    propogate = true;
-                    newScrollLeft = maxX;
-                }
-                if (newScrollTop < 0) {
-                    propogate = true;
-                    newScrollTop = 0;
-                }
-                if (newScrollTop > maxY) {
-                    propogate = true;
-                    newScrollTop = maxY;
-                }
-                elm.scrollLeft = newScrollLeft;
-                elm.scrollTop = newScrollTop;
-                return propogate;
-            }
-            return true;
-        };
-        $this.listen(this.scrollable, "DOMMouseScroll", onWheel);
-        $this.listen(this.scrollable, "mousewheel", onWheel);
-        $this.listen(this.scrollable, "wheel", onWheel);
+        let onWheelLocal = function (event) {
+            $this.onWheel.apply(this, [event, $this]);
+        }
+        $this.listen(this.scrollable, "DOMMouseScroll", onWheelLocal);
+        $this.listen(this.scrollable, "mousewheel", onWheelLocal);
+        $this.listen(this.scrollable, "wheel", onWheelLocal);
 
         // Resolve the scrollable parent for scrolling the parent
         // once we've scrolled on an extreme X or Y
