@@ -1,3 +1,5 @@
+require("./detect-element-resize.js");
+
 class StickyTablesWrappedCell {
     cell: HTMLTableCellElement;
     content: HTMLElement;
@@ -103,6 +105,8 @@ export class ScrollParentFinder {
     };
 }
 export class StickyTable {
+    public width: number;
+    public height: number;
     scrollParentFinder = new ScrollParentFinder();
     table: HTMLTableElement;
     headerRegion: StickyTableRegion;
@@ -211,6 +215,15 @@ export class StickyTable {
         if (this.setSizeIncrement === 0) {
             this.incrementTimeout = setTimeout(function () {
                 $this.resize(800, 500);
+                for (let elm of [$this.corner,
+                $this.columns,
+                $this.header,
+                $this.data]) {
+                    window["addResizeListener"](elm.content.children[0], function () {
+                        console.log("Resized");
+                        $this.resize();
+                    });
+                }
                 console.log("Sticky Table - Sizing complete");
             }, 50);
         }
@@ -493,7 +506,7 @@ export class StickyTable {
         let dataPortion =
             this.cloneTablePortion(this.table, dataRegion.startColumn, dataRegion.startRow, null, null);
         data.appendChild(dataPortion);
-        this.table.className += " sticky-table-original";
+        this.addClass(this.table, "sticky-table-original");
         this.applyTo(newTable);
     }
     private hasClass(ele: HTMLElement, cls: string) {
@@ -520,7 +533,10 @@ export class StickyTable {
         }
     }
 
-    public resize(width, height) {
+    public resize(width?: number, height?: number) {
+        this.width = width || this.width;
+        this.height = height || this.height;
+
         // Resolve these from a hidden, rendered version of the table
         let columnsWidth = this.columns.content.children[0].scrollWidth;
         let headerHeight = this.header.content.children[0].scrollHeight;
@@ -576,7 +592,8 @@ export class StickyTable {
 
     private wrapCell(row, column, className): StickyTablesWrappedCell {
         let cell = this.getCell(row, column);
-        cell.className += " " + className + " sticky-table-cell-content-container";
+        this.addClass(cell, className);
+        this.addClass(cell, "sticky-table-cell-content-container");
         let content = this.wrapContentsInDiv(cell, "sticky-table-cell-content");
         return new StickyTablesWrappedCell(cell, content);
     }
@@ -620,86 +637,91 @@ export class StickyTable {
         }
         return true;
     }
+    // Disable horizontal scrolling "back button" effect
+    // in Chrome, and also scrolling the parent scrollable
+    // element when scrolling our content (usually the body)
+    private scrollLimiter(event, element) {
+        // We don't want to scroll below zero or above the width and height 
+        let maxX = element.scrollWidth - element.offsetWidth;
+        let maxY = element.scrollHeight - element.offsetHeight;
+
+        // If this event looks like it will scroll beyond the bounds of the element, prevent it and set the scroll to the boundary manually 
+        event.preventDefault();
+        if (element.scrollLeft + event.deltaX < 0 ||
+            element.scrollLeft + event.deltaX > maxX ||
+            element.scrollTop + event.deltaY < 0 ||
+            element.scrollTop + event.deltaY > maxY) {
+            // Manually set the scroll to the boundary
+            element.scrollLeft = Math.max(0, Math.min(maxX, element.scrollLeft + event.deltaX));
+            element.scrollTop = Math.max(0, Math.min(maxY, element.scrollTop + event.deltaY));
+        }
+    };
+
+    private syncScroll(method: ScrollDataType, syncFrom: HTMLElement, syncTo: HTMLElement) {
+        let fromScroll = this.getScrollData(syncFrom, method);
+        let toScroll = this.getScrollData(syncTo, method);
+        let toPosition = toScroll.max * fromScroll.percent;
+        switch (method) {
+            case ScrollDataType.Left:
+                syncTo.scrollLeft = toPosition;
+                break;
+            case ScrollDataType.Top:
+                syncTo.scrollTop = toPosition;
+                break;
+        }
+    }
+
+    private findRows(root: Element): Array<HTMLTableRowElement> {
+        let tableRows = new Array<HTMLTableRowElement>();
+        let children = root.children;
+        for (let index = 0; index < children.length; index++) {
+            let elm = children[index];
+            if (elm instanceof HTMLTableRowElement) {
+                tableRows.push(elm);
+            } else if (elm.children && elm.children.length) {
+                tableRows = tableRows.concat(this.findRows(elm));
+            }
+        }
+        return tableRows;
+    }
+
     private applyTo(table: HTMLTableElement) {
         let $this = this;
         this.table = table;
         this.fixed = $this.wrapInDiv(this.table, "sticky-table-fixed");
         this.content = $this.wrapInDiv(this.fixed, "sticky-table-content");
         this.scrollable = $this.wrapInDiv(this.content, "sticky-table-scrollable");
-        let findRows = function (root: Element): Array<HTMLTableRowElement> {
-            let tableRows = new Array<HTMLTableRowElement>();
-            let children = root.children;
-            for (let index = 0; index < children.length; index++) {
-                let elm = children[index];
-                if (elm instanceof HTMLTableRowElement) {
-                    tableRows.push(elm);
-                } else if (elm.children && elm.children.length) {
-                    tableRows = tableRows.concat(findRows(elm));
-                }
-            }
-            return tableRows;
-        }
-        this.tableRows = findRows(table);
+        this.tableRows = $this.findRows(table);
         //let tableRows2 = findRows(table);
         this.corner = this.wrapCell(0, 0, "corner");
         this.header = this.wrapCell(0, 1, "header");
         this.columns = this.wrapCell(1, 0, "columns");
         this.data = this.wrapCell(1, 1, "data");
+
         this.row1 = this.getRow(0);
         this.addClass(this.row1, "row1");
         this.row2 = this.getRow(1);
         this.addClass(this.row2, "row2");
 
-        // Disable horizontal scrolling "back button" effect
-        // in Chrome, and also scrolling the parent scrollable
-        // element when scrolling our content (usually the body)
-        let scrollLimiter = function (event) {
-            // We don't want to scroll below zero or above the width and height 
-            let maxX = this.scrollWidth - this.offsetWidth;
-            let maxY = this.scrollHeight - this.offsetHeight;
-
-            // If this event looks like it will scroll beyond the bounds of the element, prevent it and set the scroll to the boundary manually 
-            event.preventDefault();
-            if (this.scrollLeft + event.deltaX < 0 ||
-                this.scrollLeft + event.deltaX > maxX ||
-                this.scrollTop + event.deltaY < 0 ||
-                this.scrollTop + event.deltaY > maxY) {
-                // Manually set the scroll to the boundary
-                this.scrollLeft = Math.max(0, Math.min(maxX, this.scrollLeft + event.deltaX));
-                this.scrollTop = Math.max(0, Math.min(maxY, this.scrollTop + event.deltaY));
-            }
-        };
-
-        $this.listen($this.scrollable, "mousewheel", scrollLimiter);
-        $this.listen($this.scrollable, "wheel", scrollLimiter);
-
-        let syncScroll = function (method: ScrollDataType, syncFrom: HTMLElement, syncTo: HTMLElement) {
-            let fromScroll = $this.getScrollData(syncFrom, method);
-            let toScroll = $this.getScrollData(syncTo, method);
-            let toPosition = toScroll.max * fromScroll.percent;
-            switch (method) {
-                case ScrollDataType.Left:
-                    syncTo.scrollLeft = toPosition;
-                    break;
-                case ScrollDataType.Top:
-                    syncTo.scrollTop = toPosition;
-                    break;
-            }
-        };
+        let scrollLimiterLocal = function (event) {
+            $this.scrollLimiter(event, this);
+        }
+        $this.listen($this.scrollable, "mousewheel", scrollLimiterLocal);
+        $this.listen($this.scrollable, "wheel", scrollLimiterLocal);
 
         $this.listen($this.scrollable, "scroll", function () {
-            syncScroll(ScrollDataType.Top, $this.scrollable, $this.data.cell);
-            syncScroll(ScrollDataType.Top, $this.scrollable, $this.columns.cell);
-            syncScroll(ScrollDataType.Left, $this.scrollable, $this.data.cell);
-            syncScroll(ScrollDataType.Left, $this.scrollable, $this.header.cell);
+            $this.syncScroll(ScrollDataType.Top, $this.scrollable, $this.data.cell);
+            $this.syncScroll(ScrollDataType.Top, $this.scrollable, $this.columns.cell);
+            $this.syncScroll(ScrollDataType.Left, $this.scrollable, $this.data.cell);
+            $this.syncScroll(ScrollDataType.Left, $this.scrollable, $this.header.cell);
         });
 
         let onWheelLocal = function (event) {
             $this.onWheel.apply(this, [event, $this]);
         }
-        $this.listen(this.scrollable, "DOMMouseScroll", onWheelLocal);
-        $this.listen(this.scrollable, "mousewheel", onWheelLocal);
-        $this.listen(this.scrollable, "wheel", onWheelLocal);
+        $this.listen($this.scrollable, "DOMMouseScroll", onWheelLocal);
+        $this.listen($this.scrollable, "mousewheel", onWheelLocal);
+        $this.listen($this.scrollable, "wheel", onWheelLocal);
 
         // Resolve the scrollable parent for scrolling the parent
         // once we've scrolled on an extreme X or Y
@@ -719,9 +741,6 @@ export class StickyTable {
         syncDocumentScrollPosition();
         // Just to be sure
         setTimeout(syncDocumentScrollPosition, 500);
-
-        // Whatever we want
-        //        resize(250, 250);
     }
 }
 document.addEventListener("DOMContentLoaded", function (event) {
